@@ -273,56 +273,39 @@ Example event:
 
 ## Sequence Diagram
 
-## Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User
+    participant Client
+    participant API as API Server
+    participant Auth as Auth Middleware
+    participant Validator as Action Validator
+    participant Score as Score Service
+    participant DB as Database
+    participant Redis
+    participant WS as WebSocket Server
 
-```text
-User        Client        API Server      Auth       Validator      Score Service      Database      Redis      WebSocket
- |             |              |             |            |               |                |            |            |
- | Complete    |              |             |            |               |                |            |            |
- | action      |              |             |            |               |                |            |            |
- |------------>|              |             |            |               |                |            |            |
- |             | Generate     |             |            |               |                |            |            |
- |             | actionId     |             |            |               |                |            |            |
- |             |              |             |            |               |                |            |            |
- |             | POST /actions/:actionId/complete        |               |                |            |            |
- |             | { score }    |             |            |               |                |            |            |
- |             |------------->|             |            |               |                |            |            |
- |             |              | Validate token           |               |                |            |            |
- |             |              |------------>|            |               |                |            |            |
- |             |              |<------------|            |               |                |            |            |
- |             |              | Authenticated user       |               |                |            |            |
- |             |              |                          |               |                |            |            |
- |             |              | Check actionId           |               |                |            |            |
- |             |              |---------------------------------------------------------->|            |            |
- |             |              |<----------------------------------------------------------|            |            |
- |             |              |                          |               |                |            |            |
- |             |              | Validate action & score  |               |                |            |            |
- |             |              |------------------------->|               |                |            |            |
- |             |              |<-------------------------|               |                |            |            |
- |             |              |                          |               |                |            |            |
- |             |              | Process score update     |               |                |            |            |
- |             |              |----------------------------------------->|                |            |            |
- |             |              |                          |               | Save event     |            |            |
- |             |              |                          |               |--------------->|            |            |
- |             |              |                          |               | Update score   |            |            |
- |             |              |                          |               |--------------->|            |            |
- |             |              |                          |               |<---------------|            |            |
- |             |              |                          |               |                |            |            |
- |             |              |                          |               | Update leaderboard          |            |
- |             |              |                          |               |---------------------------->|            |
- |             |              |                          |               | Get Top 10     |            |            |
- |             |              |                          |               |---------------------------->|            |
- |             |              |                          |               |<----------------------------|            |
- |             |              |                          |               |                |            |            |
- |             |              |<-----------------------------------------|                |            |            |
- |             |<-------------| Success + current score  |               |                |            |            |
- |             |              |                          |               |                |            |            |
- |             | Generate new actionId                   |               |                |            |            |
- |             |              |                          |               |                |            |            |
- |             |              |                          |               | Publish leaderboard update               |
- |             |              |                          |               |----------------------------------------->|
- |             |<---------------------------------------------------------------------------------------------------|
- |             |                           Push latest Top 10                                                       |
+    User->>Client: Complete action
+    Client->>Client: Generate actionId
+    Client->>API: POST /actions/:actionId/complete<br/>{ score }
+    API->>Auth: Validate token
+    Auth-->>API: Authenticated user
+    API->>DB: Check actionId
+    DB-->>API: Action state and rule
+    API->>Validator: Validate action and score
+    Validator-->>API: Validation result
+    API->>Score: Process score update
+    Score->>DB: Save score event
+    Score->>DB: Update user score
+    DB-->>Score: Transaction committed
+    Score->>Redis: Update leaderboard
+    Score->>Redis: Get Top 10
+    Redis-->>Score: Latest Top 10
+    Score-->>API: Success and current score
+    API-->>Client: Success and current score
+    Client->>Client: Generate new actionId
+    Score->>WS: Publish leaderboard update
+    WS-->>Client: Push latest Top 10
 ```
 
 
